@@ -1437,3 +1437,4 @@
 2024-10-28 09:19 - WARNING - OP Code unknown (ef)
 2024-10-28 09:19 - DEBUG - INSTRUCTION 0c - HLT (Halt)
 2024-10-28 09:19 - INFO - Program halted
+j
