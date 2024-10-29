@@ -12,7 +12,7 @@ logging.basicConfig(
 CONFIG_HEX_SIZE = 2
 ################################################# Utilities
 def toHex(data, length=0):
-    data = str(hex(data))
+    data = str(hex(int(data)))
     data = data.split("x")[1]
     while len(data)<length:
         data = "0" + data
@@ -22,7 +22,7 @@ def getProgram(file):
     data = open(file, "rb").read()
     program = []
     for x in range(len(data)):
-        program.append(toHex(data[x],2))
+        program.append(int(data[x]))
     return program
 #################################################
 class MEMORY:
@@ -32,14 +32,18 @@ class MEMORY:
         self.data = {}
         count = 0
         for x in range(address_size**2):
-            self.data.update({toHex(x, CONFIG_HEX_SIZE):"0"*CONFIG_HEX_SIZE})
+            self.data.update({toHex(x, CONFIG_HEX_SIZE):0})
     def get(self, address):
-        return self.data[address]
+        return self.data[toHex(address,2)]
     def set(self, address, data):
-        if int(address, 16)<=int(self.address_end, 16):
+        if int(address,16)<=int(self.address_end, 16):
             self.data[address] = data
+            logging.log(logging.DEBUG, f"MEMORY - Address {address} set to {data}")
         else:
-            logging.log(logging.ERROR, f"MEMORY - Address {address} was set to but is out of range({self.address_end})")
+            logging.log(logging.ERROR, f"MEMORY - Address out of range({self.address_end})")
+        if data>255:
+            self.data[address] = 255
+            logging.log(logging.WARNING, f"MEMORY - Data over 255, reseting to 255")
 
 class cpu:
     def __init__(self,file):
@@ -51,18 +55,26 @@ class cpu:
             self.mem.set(toHex(x,CONFIG_HEX_SIZE), self.program[x])
         self.pointer = 0
     ########################## Instruction set
-    def NOP(self):#No operation  
+    def NOP(self):#No operation - 00
         logging.log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-1, CONFIG_HEX_SIZE)} - NOP (No operation)")
-    def HLT(self):#Halt the program
+    def ADD(self):
+        item1 = self.getNext()
+        item2 = self.getNext()
+        logging.log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-3, CONFIG_HEX_SIZE)} - ADD (Add) address {item1}({self.mem.get(item1)}) + address {item2}({self.mem.get(item2)})")
+        self.mem.set(toHex(item1), self.mem.get(item1)+self.mem.get(item2))
+    
+    def HLT(self):#Halt the program - FF
         self.running =  False
         logging.log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-1, CONFIG_HEX_SIZE)} - HLT (Halt)")
         logging.log(logging.INFO, f"Program halted")
     ##########################
     def execute(self):
-        instruc = self.getNext()
+        instruc = toHex(self.getNext(),2)
         print(instruc)
         if instruc=="00":
             self.NOP()
+        elif instruc=="01":
+            self.ADD()
         elif instruc=="ff":
             self.HLT()
         else:
@@ -75,5 +87,6 @@ class cpu:
         self.running = True
         for x in range(len(self.program)):
             if self.running == False:
+                logging.log(logging.INFO, self.mem.data)
                 break
             self.execute()
