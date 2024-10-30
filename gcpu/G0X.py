@@ -1,4 +1,5 @@
 import logging
+from time import sleep
 logging.basicConfig(
     filename="app.log",
     encoding="utf-8",
@@ -59,6 +60,7 @@ class MEMORY:
 class cpu:
     def __init__(self,file):
         logging.log(logging.INFO, "CPU initialized")
+        self.gpio = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         self.program = getProgram(file)
         self.running = False
         self.mem = MEMORY(16,8)
@@ -117,7 +119,6 @@ class cpu:
             log(logging.WARN, f"OP Code unknown ({instruc})")
     def getNext(self):
         self.pointer+=1
-        print(self.pointer)
         return self.mem.get(toHex(self.pointer-1, CONFIG_HEX_SIZE))
     def run(self):
         log(logging.INFO, "Program started")
@@ -127,3 +128,4 @@ class cpu:
                 logging.log(logging.INFO, self.mem.data)
                 break
             self.execute()
+            sleep(0.1)
