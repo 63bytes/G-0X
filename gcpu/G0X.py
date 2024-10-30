@@ -10,9 +10,14 @@ logging.basicConfig(
 )
 
 CONFIG_HEX_SIZE = 2
+
+def log(level, message):
+    print(message)
+    logging.log(level, message)
+
 ################################################# Utilities
 def toHex(data, length=0):
-    data = str(hex(int(data)))
+    data = str(hex(data))
     data = data.split("x")[1]
     while len(data)<length:
         data = "0" + data
@@ -30,20 +35,26 @@ class MEMORY:
         self.address_size = address_size
         self.address_end = toHex(address_size**2-1, CONFIG_HEX_SIZE)
         self.data = {}
+        self.debug = True
         count = 0
         for x in range(address_size**2):
             self.data.update({toHex(x, CONFIG_HEX_SIZE):0})
     def get(self, address):
-        return self.data[toHex(address,2)]
+        if type(address)==int:
+            address = toHex(address,CONFIG_HEX_SIZE)
+        return self.data[address]
     def set(self, address, data):
         if int(address,16)<=int(self.address_end, 16):
             self.data[address] = data
-            logging.log(logging.DEBUG, f"MEMORY - Address {address} set to {data}")
+            if self.debug:
+                log(logging.DEBUG, f"MEMORY - Address {address} set to {data}")
         else:
-            logging.log(logging.ERROR, f"MEMORY - Address out of range({self.address_end})")
+            if self.debug:
+                log(logging.ERROR, f"MEMORY - Address out of range({self.address_end})")
         if data>255:
             self.data[address] = 255
-            logging.log(logging.WARNING, f"MEMORY - Data over 255, reseting to 255")
+            if self.debug:
+                log(logging.WARNING, f"MEMORY - Data over 255, reseting to 255")
 
 class cpu:
     def __init__(self,file):
@@ -51,41 +62,67 @@ class cpu:
         self.program = getProgram(file)
         self.running = False
         self.mem = MEMORY(16,8)
+        self.mem.debug = False
         for x in range(len(self.program)):
             self.mem.set(toHex(x,CONFIG_HEX_SIZE), self.program[x])
+        self.mem.debug = True
         self.pointer = 0
     ########################## Instruction set
     def NOP(self):#No operation - 00
-        logging.log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-1, CONFIG_HEX_SIZE)} - NOP (No operation)")
-    def ADD(self):
-        item1 = self.getNext()
-        item2 = self.getNext()
-        logging.log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-3, CONFIG_HEX_SIZE)} - ADD (Add) address {item1}({self.mem.get(item1)}) + address {item2}({self.mem.get(item2)})")
-        self.mem.set(toHex(item1), self.mem.get(item1)+self.mem.get(item2))
-    
+        log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-1, CONFIG_HEX_SIZE)} - NOP (No operation)")
     def HLT(self):#Halt the program - FF
         self.running =  False
-        logging.log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-1, CONFIG_HEX_SIZE)} - HLT (Halt)")
-        logging.log(logging.INFO, f"Program halted")
+        log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-1, CONFIG_HEX_SIZE)} - HLT (Halt)")
+        log(logging.INFO, f"Program halted")
+    def GTO(self):
+        item1 = self.getNext()
+        log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-2, CONFIG_HEX_SIZE)} - GTO (Go To) Pointer set to {item1}")
+        self.pointer = item1
+    def IFS(self):
+        item1 = self.mem.get(toHex(self.getNext()))
+        item2 = self.mem.get(toHex(self.getNext()))
+        item3 = self.getNext()
+        if item1==item2:
+            self.pointer=item3
+        log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-4, CONFIG_HEX_SIZE)} - IFS (If same) If {item1}={item2} then pointer set to {item3}")
+    
+    def ADD(self): #
+        item1 = self.getNext()
+        item2 = self.getNext()
+        log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-3, CONFIG_HEX_SIZE)} - ADD (Add) address {item1}({self.mem.get(item1)}) + address {item2}({self.mem.get(item2)})")
+        self.mem.set(toHex(item1), self.mem.get(item1)+self.mem.get(item2))
+    def SUB(self):#subtract - 02
+        item1 = self.getNext()
+        item2 = self.getNext()
+        log(logging.DEBUG, f"INSTRUCTION {toHex(self.pointer-3, CONFIG_HEX_SIZE)} - SUB (Subtract) address {item1}({self.mem.get(item1)}) - address {item2}({self.mem.get(item2)})")
+        self.mem.set(toHex(item1), self.mem.get(item1)-self.mem.get(item2))
+    
+    
     ##########################
     def execute(self):
         instruc = toHex(self.getNext(),2)
-        print(instruc)
         if instruc=="00":
             self.NOP()
         elif instruc=="01":
-            self.ADD()
-        elif instruc=="ff":
             self.HLT()
+        elif instruc=="02":
+            self.GTO()
+        elif instruc=="07":
+            self.IFS()
+        elif instruc=="10":
+            self.ADD()
+        elif instruc=="11":
+            self.SUB()
         else:
-            logging.log(logging.WARN, f"OP Code unknown ({instruc})")
+            log(logging.WARN, f"OP Code unknown ({instruc})")
     def getNext(self):
         self.pointer+=1
+        print(self.pointer)
         return self.mem.get(toHex(self.pointer-1, CONFIG_HEX_SIZE))
     def run(self):
-        logging.log(logging.INFO, "Program started")
+        log(logging.INFO, "Program started")
         self.running = True
-        for x in range(len(self.program)):
+        while True:
             if self.running == False:
                 logging.log(logging.INFO, self.mem.data)
                 break
