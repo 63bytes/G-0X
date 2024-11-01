@@ -128,4 +128,3 @@ class cpu:
                 logging.log(logging.INFO, self.mem.data)
                 break
             self.execute()
-            sleep(0.1)
